@@ -1,13 +1,38 @@
-from itertools import product
-
-import diagonal as diagonal
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 from users.models import User
+
+
+class LatestProductsManager:
+
+    @staticmethod
+    def get_products_for_module(*args, **kwargs):
+        with_respect_to = kwargs.get("with_respect_to")
+
+        products = []
+        ct_models = ContentType.objects.filter(model__in=args)
+        for el_model in ct_models:
+            model_products = el_model.model_class()._base_manager.all().order_by("-id")[:6]
+            products.extend(model_products)
+
+        if with_respect_to:
+            ct_model = ContentType.objects.filter(model=with_respect_to)
+            if ct_model.exists():
+                if with_respect_to in args:
+                    return sorted(
+                        products,
+                        key=lambda x: x.__class__._meta.model_name.startswith(with_respect_to),
+                        reverse=True
+                    )
+
+        return products
+
+
+class LatestProducts:
+    objects = LatestProductsManager()
 
 
 class Category(models.Model):
