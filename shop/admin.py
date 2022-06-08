@@ -4,10 +4,6 @@ from django import forms
 from shop.models import Category, RamProduct, NotebookProduct, SmartphoneProduct, CartProduct, Cart
 
 
-class NotebookCategoryChoiceField(forms.ModelChoiceField):
-    pass
-
-
 class NotebookAdmin(admin.ModelAdmin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -17,10 +13,6 @@ class NotebookAdmin(admin.ModelAdmin):
 
 
 admin.site.register(NotebookProduct, NotebookAdmin)
-
-
-class SmartphoneCategoryChoiceField(forms.ModelChoiceField):
-    pass
 
 
 class SmartphoneAdmin(admin.ModelAdmin):
