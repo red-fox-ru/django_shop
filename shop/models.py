@@ -1,9 +1,13 @@
+from PIL import Image
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 from users.models import User
+
+class MinResolutionValidation(Exception):
+    pass
 
 
 class LatestProductsManager:
@@ -48,6 +52,8 @@ class Category(models.Model):
 
 
 class Product(models.Model):
+    MIN_RESOLUTION = (400, 400)
+
     class Meta:
         abstract = True
 
@@ -57,9 +63,19 @@ class Product(models.Model):
     image = models.ImageField(verbose_name='Image product')
     description = models.TextField(verbose_name='Description')
     price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Price')
+    year = models.PositiveIntegerField(validators=[
+        MinValueValidator(1980)
+    ])
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        min_width, min_height = self.MIN_RESOLUTION
+        img = Image.open(self.image)
+        if img.width < min_width or img.height < min_height:
+            raise MinResolutionValidation('Разрешение изображения меньше минимального!')
+        super().save(*args, *kwargs)
 
 
 class RamProduct(Product):
@@ -70,40 +86,55 @@ class RamProduct(Product):
         ('DDR5', 'DDR5'),
     )
 
-    type_ram = models.CharField(max_length=9, choices=CHOICES_TYPE_RAM)
+    type_ram = models.CharField(max_length=9, choices=CHOICES_TYPE_RAM, verbose_name='Тип памяти')
     count_memory = models.IntegerField(validators=[
         MaxValueValidator(999),
         MinValueValidator(1)
-    ], verbose_name='RAM GB')
+    ], verbose_name='Память GB')
     frequency = models.IntegerField(validators=[
         MaxValueValidator(99999),
         MinValueValidator(1)
-    ], verbose_name='RAM frequency')
+    ], verbose_name='ОП частота GHz')
 
     class Meta:
         verbose_name = "Оперативная память"
         verbose_name_plural = "Оперативная память"
 
 
+class Processor(Product):
+    manufacturer = models.CharField(max_length=128, verbose_name='Производитель')
+    soket = models.CharField(max_length=200, verbose_name='Сокет')
+    frequency = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Частота процессора GHz')
+    cores = models.PositiveIntegerField(validators=[
+        MaxValueValidator(100),
+        MinValueValidator(1)
+    ], verbose_name='Количество ядер')
+    graphics_core = models.BooleanField(default=False, blank=True, verbose_name="Графическое ядро")
+    tdp = models.PositiveIntegerField(validators=[
+        MaxValueValidator(900),
+        MinValueValidator(10)
+    ], verbose_name='Тепловыделение Вт')
+
+
 class NotebookProduct(Product):
-    diagonal = models.CharField(max_length=225, verbose_name='Diagonal')
-    display_type = models.CharField(max_length=255, verbose_name='Display')
-    processor_frequency = models.DecimalField(max_digits=2, decimal_places=2, verbose_name='Processor Frequency')
-    ram = models.ForeignKey(RamProduct, on_delete=models.SET_NULL, verbose_name='RAM', null=True)
+    diagonal = models.CharField(max_length=225, verbose_name='Диагональ')
+    display_type = models.CharField(max_length=255, verbose_name='Дисплей')
+    processor_frequency = models.DecimalField(max_digits=2, decimal_places=2, verbose_name='Процессор частота GHz')
+    ram = models.ForeignKey(RamProduct, on_delete=models.SET_NULL, verbose_name='Оперативная память', null=True)
     number_ram_slots = models.PositiveIntegerField(validators=[
         MaxValueValidator(8),
         MinValueValidator(1)
-    ], verbose_name='Count slots RAM')
+    ], verbose_name='Количество слотов памяти ОП')
     max_memory = models.PositiveIntegerField(validators=[
         MaxValueValidator(999),
         MinValueValidator(1)
-    ], verbose_name='Max volume GB RAM')
+    ], verbose_name='Максимальное количество ОП GB')
     free_slots = models.IntegerField(default=0, validators=[
         MaxValueValidator(8),
         MinValueValidator(0)
-    ], verbose_name='Free slots RAM')
+    ], verbose_name='Свободные слоты ОП')
     graphics_element = models.CharField(max_length=255)
-    time_without_charge = models.CharField(max_length=255, verbose_name='Time work accumulated')
+    time_without_charge = models.CharField(max_length=255, verbose_name='Время работы батареи')
 
     class Meta:
         verbose_name = "Ноутбук"
@@ -114,28 +145,28 @@ class NotebookProduct(Product):
 
 
 class SmartphoneProduct(Product):
-    diagonal = models.CharField(max_length=225, verbose_name='Diagonal')
-    display_type = models.CharField(max_length=255, verbose_name='Display')
-    resolution = models.CharField(max_length=255, verbose_name='Screen Resolution')
-    processor_frequency = models.DecimalField(max_digits=2, decimal_places=2, verbose_name='Processor Frequency')
+    diagonal = models.CharField(max_length=225, verbose_name='Диагональ')
+    display_type = models.CharField(max_length=255, verbose_name='Дисплей')
+    screen = models.CharField(max_length=255, verbose_name='Разрешение экрана')
+    processor_frequency = models.DecimalField(max_digits=2, decimal_places=2, verbose_name='Частота Процессора')
     ram = models.CharField(max_length=255, verbose_name='Ram info')
     accum_volume = models.IntegerField(validators=[
         MaxValueValidator(99999),
         MinValueValidator(1)
-    ], verbose_name='Accum Volume')
-    sd = models.BooleanField(default=False, verbose_name='SD')
+    ], verbose_name='Размер Аккамулятора')
+    sd = models.BooleanField(default=False, verbose_name='Карта памяти')
     sd_volume_max = models.IntegerField(validators=[
         MaxValueValidator(999),
         MinValueValidator(1)
-    ], verbose_name='SD volume Gb')
+    ], verbose_name='Максимльный размер карты памяти Gb')
     main_cam = models.IntegerField(validators=[
         MaxValueValidator(999),
         MinValueValidator(1)
-    ], verbose_name='First camera Mp')
+    ], verbose_name='Фронтальная камера Mp')
     front_cam = models.IntegerField(validators=[
         MaxValueValidator(999),
         MinValueValidator(1)
-    ], verbose_name='Front camera Mp')
+    ], verbose_name='Камера Mp')
 
     class Meta:
         verbose_name = "Сматрфон"
@@ -146,7 +177,7 @@ class SmartphoneProduct(Product):
 
 
 class CartProduct(models.Model):
-    cart = models.ForeignKey('Cart', verbose_name='Basket', on_delete=models.CASCADE)
+    cart = models.ForeignKey('Cart', verbose_name='Корзина', on_delete=models.CASCADE)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
@@ -162,10 +193,10 @@ class CartProduct(models.Model):
 
 
 class Cart(models.Model):
-    user = models.ForeignKey(User, verbose_name='Customer', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, verbose_name='Покупатель', on_delete=models.CASCADE)
     products = models.ManyToManyField(CartProduct, blank=True, related_name='related_cart')
     total_products = models.PositiveIntegerField(default=0)
-    total_price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Total')
+    total_price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Итоговая цена')
 
     class Meta:
         verbose_name = "Корзина"
