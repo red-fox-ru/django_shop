@@ -6,8 +6,13 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-
+from django.urls import reverse
 from users.models import User
+
+
+def get_products_url(obj, view_name):
+    ct_model = obj.__class__._meta.model_name
+    return reverse(view_name, kwargs={"ct_model": ct_model, 'slug': obj.slug})
 
 
 class MinResolutionValidation(Exception):
@@ -116,6 +121,9 @@ class RamProduct(Product):
         MinValueValidator(1)
     ], verbose_name='ОП частота GHz')
 
+    def get_absolute_url(self):
+        return get_products_url(self, 'product_detail')
+
     class Meta:
         verbose_name = "Оперативная память"
         verbose_name_plural = "Оперативная память"
@@ -134,6 +142,13 @@ class Processor(Product):
         MaxValueValidator(900),
         MinValueValidator(10)
     ], verbose_name='Тепловыделение Вт')
+
+    def get_absolute_url(self):
+        return get_products_url(self, 'product_detail')
+
+    class Meta:
+        verbose_name = "Процессор"
+        verbose_name_plural = "Процессоры"
 
 
 class NotebookProduct(Product):
@@ -155,6 +170,9 @@ class NotebookProduct(Product):
     ], verbose_name='Свободные слоты ОП')
     graphics_element = models.CharField(max_length=255)
     time_without_charge = models.CharField(max_length=255, verbose_name='Время работы батареи')
+
+    def get_absolute_url(self):
+        return get_products_url(self, 'product_detail')
 
     class Meta:
         verbose_name = "Ноутбук"
@@ -187,6 +205,9 @@ class SmartphoneProduct(Product):
         MaxValueValidator(999),
         MinValueValidator(1)
     ], verbose_name='Камера Mp')
+
+    def get_absolute_url(self):
+        return get_products_url(self, 'product_detail')
 
     class Meta:
         verbose_name = "Сматрфон"
