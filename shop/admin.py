@@ -10,7 +10,9 @@ class ImageAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['image'].help_text = mark_safe(
-            "Изображение с минимальным разрешением {}х{}".format(*Product.MIN_RESOLUTION)
+            """<span style="color:red;"> Изображение c разрешением от {}х{} до {}x{}</span>""".format(
+                *Product.MIN_RESOLUTION,
+                *Product.MAX_RESOLUTION)
         )
 
 

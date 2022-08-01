@@ -1,12 +1,25 @@
+import sys
+from io import BytesIO
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-
+from django.urls import reverse
 from users.models import User
 
+
+def get_products_url(obj, view_name):
+    ct_model = obj.__class__._meta.model_name
+    return reverse(view_name, kwargs={"ct_model": ct_model, 'slug': obj.slug})
+
+
 class MinResolutionValidation(Exception):
+    pass
+
+
+class MaxResolutionValidation(Exception):
     pass
 
 
@@ -53,16 +66,17 @@ class Category(models.Model):
 
 class Product(models.Model):
     MIN_RESOLUTION = (400, 400)
+    MAX_RESOLUTION = (800, 1280)
 
     class Meta:
         abstract = True
 
-    category = models.ForeignKey(Category, verbose_name='Category', on_delete=models.CASCADE)
-    title = models.CharField(max_length=255, verbose_name='Title')
+    category = models.ForeignKey(Category, verbose_name='Категория', on_delete=models.CASCADE)
+    title = models.CharField(max_length=255, verbose_name='Загаловок')
     slug = models.SlugField(unique=True)
-    image = models.ImageField(verbose_name='Image product')
-    description = models.TextField(verbose_name='Description')
-    price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Price')
+    image = models.ImageField(verbose_name='Изображение')
+    description = models.TextField(verbose_name='Описание')
+    price = models.DecimalField(max_digits=9, decimal_places=2, verbose_name='Цена')
     year = models.PositiveIntegerField(validators=[
         MinValueValidator(1980)
     ])
@@ -72,9 +86,20 @@ class Product(models.Model):
 
     def save(self, *args, **kwargs):
         min_width, min_height = self.MIN_RESOLUTION
+        max_width, max_height = self.MAX_RESOLUTION
         img = Image.open(self.image)
         if img.width < min_width or img.height < min_height:
             raise MinResolutionValidation('Разрешение изображения меньше минимального!')
+        if img.width > max_width or img.height > max_height:
+            new_image = img.convert('RGB')
+            resized_img = new_image.resize((max_width, max_height), Image.ANTIALIAS)
+            file_ = BytesIO()
+            resized_img.save(file_, 'JPEG', quality=90)
+            file_.seek(0)
+            name = '{}.{}'.format(*self.img.name.split('.'))
+            self.image = InMemoryUploadedFile(file_, 'ImageField', name, 'jpeg/image', sys.getsizeof(file_), None)
+            super().save(*args, **kwargs)
+            raise MaxResolutionValidation('Изображение слишком большое, оно было обрезано!')
         super().save(*args, *kwargs)
 
 
@@ -96,6 +121,9 @@ class RamProduct(Product):
         MinValueValidator(1)
     ], verbose_name='ОП частота GHz')
 
+    def get_absolute_url(self):
+        return get_products_url(self, 'product_detail')
+
     class Meta:
         verbose_name = "Оперативная память"
         verbose_name_plural = "Оперативная память"
@@ -114,6 +142,13 @@ class Processor(Product):
         MaxValueValidator(900),
         MinValueValidator(10)
     ], verbose_name='Тепловыделение Вт')
+
+    def get_absolute_url(self):
+        return get_products_url(self, 'product_detail')
+
+    class Meta:
+        verbose_name = "Процессор"
+        verbose_name_plural = "Процессоры"
 
 
 class NotebookProduct(Product):
@@ -135,6 +170,9 @@ class NotebookProduct(Product):
     ], verbose_name='Свободные слоты ОП')
     graphics_element = models.CharField(max_length=255)
     time_without_charge = models.CharField(max_length=255, verbose_name='Время работы батареи')
+
+    def get_absolute_url(self):
+        return get_products_url(self, 'product_detail')
 
     class Meta:
         verbose_name = "Ноутбук"
@@ -167,6 +205,9 @@ class SmartphoneProduct(Product):
         MaxValueValidator(999),
         MinValueValidator(1)
     ], verbose_name='Камера Mp')
+
+    def get_absolute_url(self):
+        return get_products_url(self, 'product_detail')
 
     class Meta:
         verbose_name = "Сматрфон"
